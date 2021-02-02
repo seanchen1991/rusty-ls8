@@ -12,6 +12,8 @@ pub enum Instruction {
     HLT,
     JMP(Register),
     PRN(Register),
+    PUSH(Register),
+    POP(Register),
     LDI(Register, u8),
     MUL(Register, Register),
 }
@@ -21,6 +23,7 @@ pub struct VM {
     pub ip: Address,
     pub terminated: bool,
     pub code: Vec<u8>,
+    pub stack: Vec<u8>,
     pub registers: [Register; 8],
 }
 
@@ -41,6 +44,18 @@ impl VM {
                 self.ip += 1;
                 let reg = self.code[self.ip] as Register;
                 Instruction::JMP(reg)
+            },
+            69 => {
+                // PUSH instruction
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                Instruction::PUSH(reg)
+            },
+            70 => {
+                // POP instruction   
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                Instruction::POP(reg)
             },
             71 => {
                 // PRN instruction 
@@ -81,6 +96,19 @@ impl VM {
                 let val = &self.registers[reg];
                 println!("{:?}", val);
                 true
+            },
+            Instruction::PUSH(reg) => {
+                let val = self.registers[reg] as u8;
+                self.stack.push(val);
+                true
+            },
+            Instruction::POP(reg) => {
+                if let Some(top) = self.stack.pop() {
+                    self.registers[reg] = top as usize;
+                    true 
+                } else {
+                    false
+                }
             },
             Instruction::LDI(reg, arg) => {
                 self.registers[reg] = arg as usize;
@@ -132,6 +160,7 @@ impl FromStr for VM {
             ip: 0,
             terminated: true,
             code,
+            stack: Vec::new(),
             registers: [0; 8],
         })
     }
