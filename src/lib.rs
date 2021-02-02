@@ -10,7 +10,7 @@ pub enum Instruction {
     HLT,
     JMP(Register),
     PRN(Register),
-    LDI(Register, i32),
+    LDI(Register, u8),
 }
 
 #[derive(Clone, Debug)]
@@ -29,52 +29,76 @@ pub enum InstructionError {
     InvalidArgumentValue(ParseIntError),
 }
 
-// impl VM {
-//     fn decode(&mut self) -> Instruction {
-//         match self.instructions[self.ip] {
-//             0 => Instruction::NOP,
-//             1 => Instruction::HLT,
-//             3 => {
-//                 self.ip += 1;
-//                 let reg = self.instructions[self.ip] as Register;
-//                 Instruction::JMP(reg)
-//             },
-//             71 => {
+impl VM {
+    fn decode(&mut self) -> Result<Instruction, InstructionError> {
+        // println!("Decoding {:?}", self.code[self.ip]);
+
+        let decoded = match self.code[self.ip] {
+            0 => Instruction::NOP,
+            1 => Instruction::HLT,
+            3 => {
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                Instruction::JMP(reg)
+            },
+            71 => {
                 // PRN instruction 
-//                 self.ip += 1;
-//                 let reg = self.instructions[self.ip] as Register;
-//                 Instruction::PRN(reg)
-//             },
-//             130 => {
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                Instruction::PRN(reg)
+            },
+            130 => {
                 // LDI instruction 
-//                 self.ip += 1;
-//                 let reg = self.instructions[self.ip] as Register;
-//                 self.ip += 1;
-//                 let arg = self.instruction[self.ip];
-//                 Instruction::LDI(reg, arg)
-//             }
-//         }
-//     }
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                self.ip += 1;
+                let arg = self.code[self.ip];
+                Instruction::LDI(reg, arg)
+            },
+            code => return Err(InstructionError::InvalidInstruction(format!("{:?}", code))),
+        };
 
-//     pub fn run(&mut self) {
-        // vm is already running 
-//         if !self.terminated { return; }
+        Ok(decoded)
+    }
 
-//         self.terminated = false;
+    fn execute(&mut self, inst: Instruction) -> bool {
+        match inst {
+            Instruction::NOP => true,
+            Instruction::HLT => {
+                self.terminated = true;
+                true
+            },
+            Instruction::PRN(reg) => {
+                let val = &self.registers[reg];
+                println!("{:?}", val);
+                true
+            },
+            Instruction::LDI(reg, arg) => {
+                self.registers[reg] = arg as usize;
+                true
+            },
+            _ => false,
+        }
+    }
 
-//         while self.ip < self.instructions.len() && !self.terminated {
+    pub fn run(&mut self) {
+        // if !self.terminated { return; }
+
+        // self.terminated = false;
+
+        while self.ip < self.code.len() && !self.terminated {
             // decode the next instruction and its arguments
-//             let inst = self.decode();
-//             let result = self.execute();
+            let inst = self.decode().expect("Failed to decode an instruction");
+            let result = self.execute(inst);
 
-//             if !result {
-//                 panic!("Failed to execute instruction at address: {}", self.ip);
-//             }
+            if !result {
+                panic!("Failed to execute instruction at address: {}", self.ip);
+            }
 
-//             self.ip += 1;
-//         }
-//     } 
-// }
+            self.ip += 1;
+        }
+    } 
+}
 
 impl FromStr for VM {
     type Err = InstructionError;
@@ -85,7 +109,8 @@ impl FromStr for VM {
                 let inst = inst.trim();
                 u8::from_str_radix(inst, 2)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         Ok(VM {
             ip: 0,
@@ -97,17 +122,22 @@ impl FromStr for VM {
 }
 
 #[cfg(test)]
-#[test]
-fn test_parse_instructions() {
-    let input = "10000010
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vm_from_str() {
+        let input = "10000010
 00000000
 00001000
 01000111
 00000000
 00000001";
-    
-    let expected = vec![130, 0, 8, 71, 0, 1];
-    let vm = VM::from_str(input).expect("Failed to parse input in `test_parse_instructions`");
+        
+        let expected = vec![130, 0, 8, 71, 0, 1];
+        let vm = VM::from_str(input).expect("Failed to parse input in `test_parse_instructions`");
 
-    assert_eq!(vm.code, expected);
+        assert_eq!(vm.code, expected);
+    }   
 }
+
