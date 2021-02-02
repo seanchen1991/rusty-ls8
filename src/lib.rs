@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::num::ParseIntError;
 
+const SPLIT_INDEX: usize = 8;
+
 type Register = usize;
 type Address = usize;
 
@@ -31,8 +33,6 @@ pub enum InstructionError {
 
 impl VM {
     fn decode(&mut self) -> Result<Instruction, InstructionError> {
-        // println!("Decoding {:?}", self.code[self.ip]);
-
         let decoded = match self.code[self.ip] {
             0 => Instruction::NOP,
             1 => Instruction::HLT,
@@ -82,9 +82,9 @@ impl VM {
     }
 
     pub fn run(&mut self) {
-        // if !self.terminated { return; }
+        if !self.terminated { return; }
 
-        // self.terminated = false;
+        self.terminated = false;
 
         while self.ip < self.code.len() && !self.terminated {
             // decode the next instruction and its arguments
@@ -105,8 +105,9 @@ impl FromStr for VM {
 
     fn from_str(program: &str) -> Result<Self, Self::Err> {
         let code = program.lines()
-            .map(|inst| {
-                let inst = inst.trim();
+            .filter(|line| !line.starts_with('#') && line.len() >= 8)
+            .map(|line| {
+                let (inst, _) = line.split_at(SPLIT_INDEX);
                 u8::from_str_radix(inst, 2)
             })
             .collect::<Result<Vec<_>, _>>()
@@ -114,7 +115,7 @@ impl FromStr for VM {
 
         Ok(VM {
             ip: 0,
-            terminated: false,
+            terminated: true,
             code,
             registers: [0; 8],
         })
@@ -135,9 +136,28 @@ mod tests {
 00000001";
         
         let expected = vec![130, 0, 8, 71, 0, 1];
-        let vm = VM::from_str(input).expect("Failed to parse input in `test_parse_instructions`");
+        let vm = VM::from_str(input).expect("Failed to parse input in `test_vm_from_str`");
 
         assert_eq!(vm.code, expected);
     }   
+
+    #[test]
+    fn test_vm_from_str_with_comments() {
+        let input = "
+# This comment and blank line is here to make sure
+# they are handled correctly by the file reading code.
+
+10000010 # LDI R0,8
+00000000
+00001000
+01000111 # PRN R0
+00000000
+00000001 # HLT"; 
+
+        let expected = vec![130, 0, 8, 71, 0, 1];
+        let vm = VM::from_str(input).expect("Failed to parse input in `test_vm_from_str_with_comments`");
+
+        assert_eq!(vm.code, expected);
+    }
 }
 

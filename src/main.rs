@@ -1,16 +1,37 @@
+use std::fs;
+use std::env;
+use std::process;
 use std::str::FromStr;
 
 use rusty_ls8::*;
 
 fn main() {
-    let input = "10000010
-00000000
-00001000
-01000111
-00000000
-00000001";
+    let mut args = env::args();
+    args.next();
     
-    let mut vm = VM::from_str(input).expect("Failed to parse input");
+    let filename = match args.next() {
+        Some(f) => f,
+        None => {
+            eprintln!("No filename found.");
+            process::exit(1);
+        }
+    };
+
+    let input = match fs::read_to_string(filename) {
+        Ok(contents) => contents,
+        Err(_) => {
+            eprintln!("Failed to read file contents.");
+            process::exit(1);
+        }
+    };
+
+    let mut vm = match VM::from_str(&input) {
+        Ok(vm) => vm,
+        Err(_) => {
+            eprintln!("Failed to initialize VM.");
+            process::exit(1);
+        }
+    };
 
     vm.run();
 }
