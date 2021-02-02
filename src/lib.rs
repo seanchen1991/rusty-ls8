@@ -13,6 +13,7 @@ pub enum Instruction {
     JMP(Register),
     PRN(Register),
     LDI(Register, u8),
+    MUL(Register, Register),
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +56,14 @@ impl VM {
                 let arg = self.code[self.ip];
                 Instruction::LDI(reg, arg)
             },
+            162 => {
+                // MUL instruction
+                self.ip += 1;
+                let areg = self.code[self.ip] as Register;
+                self.ip += 1;
+                let breg = self.code[self.ip] as Register;
+                Instruction::MUL(areg, breg)
+            }
             code => return Err(InstructionError::InvalidInstruction(format!("{:?}", code))),
         };
 
@@ -77,6 +86,12 @@ impl VM {
                 self.registers[reg] = arg as usize;
                 true
             },
+            Instruction::MUL(areg, breg) => {
+                let aval = &self.registers[areg];
+                let bval = &self.registers[breg];
+                self.registers[areg] = aval * bval;
+                true
+            }
             _ => false,
         }
     }
@@ -125,37 +140,16 @@ impl FromStr for VM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    const TEST_FILENAME: &str = "asm/print8.ls8";
 
     #[test]
     fn test_vm_from_str() {
-        let input = "10000010
-00000000
-00001000
-01000111
-00000000
-00000001";
-        
-        let expected = vec![130, 0, 8, 71, 0, 1];
-        let vm = VM::from_str(input).expect("Failed to parse input in `test_vm_from_str`");
-
-        assert_eq!(vm.code, expected);
-    }   
-
-    #[test]
-    fn test_vm_from_str_with_comments() {
-        let input = "
-# This comment and blank line is here to make sure
-# they are handled correctly by the file reading code.
-
-10000010 # LDI R0,8
-00000000
-00001000
-01000111 # PRN R0
-00000000
-00000001 # HLT"; 
+        let input = fs::read_to_string(TEST_FILENAME).expect("Failed to read file in `test_vm_from_str_with_comments`");
 
         let expected = vec![130, 0, 8, 71, 0, 1];
-        let vm = VM::from_str(input).expect("Failed to parse input in `test_vm_from_str_with_comments`");
+        let vm = VM::from_str(&input).expect("Failed to parse input in `test_vm_from_str_with_comments`");
 
         assert_eq!(vm.code, expected);
     }
