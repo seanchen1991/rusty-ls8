@@ -1,21 +1,24 @@
 use std::str::FromStr;
 use std::num::ParseIntError;
 
-const SPLIT_INDEX: usize = 4;
+type Register = usize;
+type Address = usize;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Instruction {
     NOP,
-    ACC(i32),
-    JMP(i32),
+    HLT,
+    JMP(Register),
+    PRN(Register),
+    LDI(Register, i32),
 }
 
 #[derive(Clone, Debug)]
 pub struct VM {
-    pub ip: i32,
-    pub accumulator: i32,
-    pub instructions: Vec<Instruction>,
+    pub ip: Address,
     pub terminated: bool,
+    pub code: Vec<u8>,
+    pub registers: [Register; 8],
 }
 
 #[derive(Debug)]
@@ -26,50 +29,69 @@ pub enum InstructionError {
     InvalidArgumentValue(ParseIntError),
 }
 
-impl VM {
-    pub fn step(&mut self) {
-        let mut jmp = 1;
+// impl VM {
+//     fn decode(&mut self) -> Instruction {
+//         match self.instructions[self.ip] {
+//             0 => Instruction::NOP,
+//             1 => Instruction::HLT,
+//             3 => {
+//                 self.ip += 1;
+//                 let reg = self.instructions[self.ip] as Register;
+//                 Instruction::JMP(reg)
+//             },
+//             71 => {
+                // PRN instruction 
+//                 self.ip += 1;
+//                 let reg = self.instructions[self.ip] as Register;
+//                 Instruction::PRN(reg)
+//             },
+//             130 => {
+                // LDI instruction 
+//                 self.ip += 1;
+//                 let reg = self.instructions[self.ip] as Register;
+//                 self.ip += 1;
+//                 let arg = self.instruction[self.ip];
+//                 Instruction::LDI(reg, arg)
+//             }
+//         }
+//     }
 
-        match self.instructions[self.ip as usize] {
-            Instruction::ACC(arg) => self.accumulator += arg,
-            Instruction::JMP(arg) => jmp = arg,
-            Instruction::NOP      => {},
-        }
+//     pub fn run(&mut self) {
+        // vm is already running 
+//         if !self.terminated { return; }
 
-        self.ip += jmp;
-        self.terminated = (self.ip as usize) >= self.instructions.len();
-    }
-}
+//         self.terminated = false;
 
-impl FromStr for Instruction {
-    type Err = InstructionError;
+//         while self.ip < self.instructions.len() && !self.terminated {
+            // decode the next instruction and its arguments
+//             let inst = self.decode();
+//             let result = self.execute();
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (inst, arg) = s.split_at(SPLIT_INDEX);
-        let arg = arg.trim().parse::<i32>().map_err(InstructionError::InvalidArgumentValue)?;
+//             if !result {
+//                 panic!("Failed to execute instruction at address: {}", self.ip);
+//             }
 
-        match inst.trim() {
-            "nop" => Ok(Instruction::NOP),
-            "acc" => Ok(Instruction::ACC(arg)),
-            "jmp" => Ok(Instruction::JMP(arg)),
-            op    => Err(InstructionError::InvalidInstruction(op.to_string())),
-        }
-    }
-}
+//             self.ip += 1;
+//         }
+//     } 
+// }
 
 impl FromStr for VM {
     type Err = InstructionError;
 
     fn from_str(program: &str) -> Result<Self, Self::Err> {
-        let instructions = program.lines()
-            .map(|inst| Instruction::from_str(inst))
-            .collect::<Result<Vec<_>, InstructionError>>()?;
+        let code = program.lines()
+            .map(|inst| {
+                let inst = inst.trim();
+                u8::from_str_radix(inst, 2)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(VM {
             ip: 0,
-            accumulator: 0,
-            instructions: instructions,
             terminated: false,
+            code,
+            registers: [0; 8],
         })
     }
 }
@@ -77,29 +99,15 @@ impl FromStr for VM {
 #[cfg(test)]
 #[test]
 fn test_parse_instructions() {
-    let input = "nop +0
-acc +1
-jmp +4
-acc +3
-jmp -3
-acc -99
-acc +1
-jmp -4
-acc +6";
+    let input = "10000010
+00000000
+00001000
+01000111
+00000000
+00000001";
     
-    let expected = vec![
-        Instruction::NOP,
-        Instruction::ACC(1),
-        Instruction::JMP(4),
-        Instruction::ACC(3),
-        Instruction::JMP(-3),
-        Instruction::ACC(-99),
-        Instruction::ACC(1),
-        Instruction::JMP(-4),
-        Instruction::ACC(6),
-    ];
-
+    let expected = vec![130, 0, 8, 71, 0, 1];
     let vm = VM::from_str(input).expect("Failed to parse input in `test_parse_instructions`");
 
-    assert_eq!(vm.instructions, expected);
+    assert_eq!(vm.code, expected);
 }
