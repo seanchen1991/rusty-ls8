@@ -10,12 +10,15 @@ type Address = usize;
 pub enum Instruction {
     NOP,
     HLT,
+    RET,
     JMP(Register),
     PRN(Register),
+    CALL(Register),
     PUSH(Register),
     POP(Register),
     LDI(Register, u8),
     MUL(Register, Register),
+    DIV(Register, Register),
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +48,7 @@ impl VM {
                 let reg = self.code[self.ip] as Register;
                 Instruction::JMP(reg)
             },
+            17 => Instruction::RET,
             69 => {
                 // PUSH instruction
                 self.ip += 1;
@@ -63,6 +67,12 @@ impl VM {
                 let reg = self.code[self.ip] as Register;
                 Instruction::PRN(reg)
             },
+            80 => {
+                // CALL instruction   
+                self.ip += 1;
+                let reg = self.code[self.ip] as Register;
+                Instruction::CALL(reg)
+            },
             130 => {
                 // LDI instruction 
                 self.ip += 1;
@@ -78,7 +88,15 @@ impl VM {
                 self.ip += 1;
                 let breg = self.code[self.ip] as Register;
                 Instruction::MUL(areg, breg)
-            }
+            },
+            163 => {
+                // DIV instruction
+                self.ip += 1;
+                let areg = self.code[self.ip] as Register;
+                self.ip += 1;
+                let breg = self.code[self.ip] as Register;
+                Instruction::DIV(areg, breg)
+            },
             code => return Err(InstructionError::InvalidInstruction(format!("{:?}", code))),
         };
 
@@ -97,6 +115,11 @@ impl VM {
                 println!("{:?}", val);
                 true
             },
+            Instruction::JMP(reg) => {
+                let dest = self.registers[reg] as Address;
+                self.ip = dest;
+                true
+            },
             Instruction::PUSH(reg) => {
                 let val = self.registers[reg] as u8;
                 self.stack.push(val);
@@ -110,6 +133,19 @@ impl VM {
                     false
                 }
             },
+            Instruction::CALL(reg) => {
+                self.stack.push(self.ip as u8 + 1);
+                self.execute(Instruction::JMP(reg))
+            },
+            Instruction::RET => {
+                match self.stack.pop() {
+                    Some(v) => {
+                        self.ip = v as Address;
+                        true
+                    },
+                    None => false,
+                }   
+            },
             Instruction::LDI(reg, arg) => {
                 self.registers[reg] = arg as usize;
                 true
@@ -119,8 +155,13 @@ impl VM {
                 let bval = &self.registers[breg];
                 self.registers[areg] = aval * bval;
                 true
+            },
+            Instruction::DIV(areg, breg) => {
+                let aval = &self.registers[areg];
+                let bval = &self.registers[breg];
+                self.registers[areg] = aval / bval;
+                true
             }
-            _ => false,
         }
     }
 
